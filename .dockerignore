@@ -6,3 +6,4 @@ scripts/
 migrations/
 *.log
 .git
+spec.yaml
