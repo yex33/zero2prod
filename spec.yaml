@@ -18,6 +18,16 @@ services:
     health_check:
       # The path to our health check endpoint! It turned out to be useful in the end!
       http_path: /health_check
+      # How often to check (in seconds). Default is 10.
+      period_seconds: 60
+      # How long to wait for a response before failing. Default is 1.
+      timeout_seconds: 5
+      # Number of seconds to wait after startup before the first check.
+      initial_delay_seconds: 10
+      # Consecutive failures before marking the app "Down". Default is 3.
+      failure_threshold: 5
+      # Consecutive successes before marking the app "Up". Default is 1.
+      success_threshold: 1
     # The port the application will be listening on for incoming requests
     # It should match what we specify in our configuration.yaml file!
     http_port: 8000
