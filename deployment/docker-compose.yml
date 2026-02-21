@@ -8,3 +8,10 @@ services:
       context: ..
     ports:
       - "8000:8000"
+    environment:
+      - APP_DATABASE__HOST=db
+      - APP_DATABASE__PORT=5432
+      - APP_DATABASE__REQUIRE_SSL=false
+    depends_on:
+      db:
+        condition: service_healthy
