@@ -2,7 +2,7 @@ FROM lukemathwalker/cargo-chef:latest-rust-trixie AS chef
 WORKDIR /app
 
 FROM chef AS planner
-COPY . .
+COPY Cargo.toml Cargo.lock ./
 # Compute a lock-like file for our project
 RUN cargo chef prepare --recipe-path recipe.json
 
