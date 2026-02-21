@@ -7,14 +7,10 @@ name: zero2prod
 region: tor1
 services:
   - name: zero2prod
-    # Relative to the repository root
-    dockerfile_path: Dockerfile
-    source_dir: .
-    github:
-      branch: main
-      # Deploy a new version on every commit to `main`
-      deploy_on_push: true
-      repo: yex33/zero2prod
+    image:
+      registry_type: "DOCR"
+      repository: "yex33/zero2prod"
+      tag: "latest"
     # Active probe used by DigitalOcean's to ensure our application is healthy
     health_check:
       # The path to our health check endpoint! It turned out to be useful in the end!

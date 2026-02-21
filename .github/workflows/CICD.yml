@@ -163,3 +163,43 @@ jobs:
         with:
           name: "Coverage report"
           path: coverage/
+
+  build_and_push:
+    needs: [test, fmt, clippy, coverage]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DO_ACCESS_TOKEN }}
+
+      - name: Log in to DigitalOcean Container Registry
+        run: doctl registry login --expiry-seconds 1200
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          # Replace <registry-name> with your DOCR name
+          tags: registry.digitalocean.com/yex33/zero2prod:latest
+          # This is the magic for cargo-chef: it persists layers on GitHub
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build_and_push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DO_ACCESS_TOKEN }}
+
+      - name: Update DO App Platform
+        # This tells DO to pull the latest image we just pushed
+        run: doctl apps create-deployment ${{ secrets.DO_APP_ID }}

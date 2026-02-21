@@ -1,10 +1,14 @@
-FROM lukemathwalker/cargo-chef:0.1.73-rust-1.93.1-trixie AS chef
+FROM lukemathwalker/cargo-chef:latest-rust-trixie AS chef
 WORKDIR /app
 ENV CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse
 
+FROM chef AS planner
+COPY . .
+# Compute a lock-like file for our project
+RUN cargo chef prepare --recipe-path recipe.json
+
 FROM chef AS builder
-# Generate recipe locally to force caching
-COPY recipe.json recipe.json
+COPY --from=planner /app/recipe.json recipe.json
 # Build dependencies - this is the caching Docker layer!
 RUN cargo chef cook --release --recipe-path recipe.json
 # Build application
