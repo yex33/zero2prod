@@ -5,6 +5,9 @@ name: zero2prod
 # You can get region slugs from https://www.digitalocean.com/docs/platform/availability-matrix/
 # `tor1` stands for Toronto, Canada
 region: tor1
+domains:
+  - domain: newsletter.xzyxz.xyz
+    type: PRIMARY
 services:
   - name: zero2prod
     image:
