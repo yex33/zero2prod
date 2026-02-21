@@ -2,6 +2,7 @@
 target/
 tests/
 Dockerfile
+scripts/
 migrations/
 *.log
 .git
