@@ -9,7 +9,7 @@ services:
   - name: zero2prod
     image:
       registry_type: "DOCR"
-      repository: "yex33/zero2prod"
+      repository: "zero2prod"
       tag: "latest"
     # Active probe used by DigitalOcean's to ensure our application is healthy
     health_check:
