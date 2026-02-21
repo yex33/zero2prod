@@ -3,13 +3,8 @@ WORKDIR /app
 ENV CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse
 
 FROM chef AS builder
-# Combine planning and cooking to remove cross-stage dependencies
-COPY Cargo.toml Cargo.lock ./
-# DEBUG: Check if manifests are actually identical to the last run
-RUN sha256sum Cargo.toml Cargo.lock
-RUN cargo chef prepare --recipe-path recipe.json
-# DEBUG: Check if the recipe itself is identical
-RUN sha256sum recipe.json
+# Generate recipe locally to force caching
+COPY recipe.json recipe.json
 # Build dependencies - this is the caching Docker layer!
 RUN cargo chef cook --release --recipe-path recipe.json
 # Build application
