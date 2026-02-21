@@ -1,0 +1,10 @@
+include:
+  - ./../infra/docker-compose.yml
+
+services:
+  zero2prod:
+    container_name: zero2prod
+    build:
+      context: ..
+    ports:
+      - "8000:8000"
