@@ -32,7 +32,9 @@ pub fn get_configuration() -> Result<Settings, config::ConfigError> {
 
     let settings = config::Config::builder()
         .add_source(config::File::from(configuration_directory.join("base")))
-        .add_source(config::File::from(configuration_directory.join(environment.as_str())))
+        .add_source(config::File::from(
+            configuration_directory.join(environment.as_str()),
+        ))
         .build()?;
     settings.try_deserialize::<Settings>()
 }
