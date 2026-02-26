@@ -28,6 +28,7 @@ serde = { version = "1", features = ["derive"] }
 serde-aux = "4.7"
 config = "0.15"
 reqwest = { version = "0.13.2", default-features = false, features = ["json", "rustls"] }
+rand = { version = "0.10", features = ["std_rng"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 tracing = { version = "0.1", features = ["log"] }
 tracing-actix-web = "0.7"
