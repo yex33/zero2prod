@@ -11,7 +11,7 @@ path = "src/main.rs"
 name = "zero2prod"
 
 [dev-dependencies]
-claim = "0.5"
+claims = "0.8"
 fake = "4.4"
 quickcheck = "1.1.0"
 quickcheck_macros = "1.2.0"
