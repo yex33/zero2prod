@@ -193,6 +193,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   deploy:
+    name: Deploy to DigitialOcean Container Registry
     needs: build_and_push
     runs-on: ubuntu-latest
     steps:
