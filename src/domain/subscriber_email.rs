@@ -24,8 +24,7 @@ mod test {
     use super::SubscriberEmail;
     use claim::assert_err;
     use fake::Fake;
-    use fake::faker::internet::raw::SafeEmail;
-    use fake::locales::EN;
+    use fake::faker::internet::en::SafeEmail;
     use fake::rand::SeedableRng;
     use fake::rand::rngs::StdRng;
     use quickcheck::Gen;
@@ -36,7 +35,7 @@ mod test {
     impl quickcheck::Arbitrary for ValidEmailFixture {
         fn arbitrary(g: &mut Gen) -> Self {
             let mut rng = StdRng::seed_from_u64(u64::arbitrary(g));
-            let email = SafeEmail(EN).fake_with_rng(&mut rng);
+            let email = SafeEmail().fake_with_rng(&mut rng);
             Self(email)
         }
     }
