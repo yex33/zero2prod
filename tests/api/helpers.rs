@@ -1,8 +1,7 @@
-use std::sync::LazyLock;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
-use zero2prod::configuration::{get_configuration, DatabaseSettings};
-use zero2prod::email_client::EmailClient;
-use zero2prod::startup::run;
+use std::sync::LazyLock;
+use zero2prod::configuration::{DatabaseSettings, get_configuration};
+use zero2prod::startup::{Application, get_connection_pool};
 use zero2prod::telemetry::{get_subscriber, init_subscriber};
 
 static TRACING: LazyLock<()> = LazyLock::new(|| {
@@ -27,36 +26,43 @@ pub struct TestApp {
 pub async fn spawn_app() -> TestApp {
     LazyLock::force(&TRACING);
 
-    let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("Failed to bind random port");
-    let port = listener.local_addr().unwrap().port();
-    let address = format!("http://127.0.0.1:{}", port);
+    let configuration = {
+        let mut c = get_configuration().expect("Failed to read configuration");
+        // Use a different database for each test case
+        c.database.database_name = uuid::Uuid::new_v4().to_string();
+        // Use a random OS port
+        c.application.port = 0;
+        c
+    };
+    configure_database(&configuration.database).await;
 
-    let mut configuration = get_configuration().expect("Failed to read configuration");
-    configuration.database.database_name = uuid::Uuid::new_v4().to_string();
-    let connection_pool = configure_database(&configuration.database).await;
+    let application = Application::build(configuration.clone())
+        .await
+        .expect("Failed to build application");
+    let address = format!("http://127.0.0.1:{}", application.port());
 
-    let sender_email = configuration
-        .email_client
-        .sender()
-        .expect("Invalid sender email address");
-    let timeout = configuration.email_client.timeout();
-    let email_client = EmailClient::new(
-        configuration.email_client.base_url,
-        sender_email,
-        configuration.email_client.authorization_token,
-        timeout,
-    );
-
-    let server =
-        run(listener, connection_pool.clone(), email_client).expect("Failed to start server");
-    let _ = tokio::spawn(server);
+    let _ = tokio::spawn(application.run_until_stopped());
     TestApp {
         address,
-        db_pool: connection_pool,
+        db_pool: get_connection_pool(&configuration.database),
     }
 }
 
-async fn configure_database(config: &DatabaseSettings) -> PgPool {
+/// Bootstraps a fresh database instance for the application.
+///
+/// This function performs two main orchestration steps:
+/// 1. **Creation**: Connects to the PostgreSQL server to execute a `CREATE DATABASE` command using
+/// the name provided in the `config`.
+/// 2. **Migration**: Connects to the newly created database and runs all pending SQL migrations
+/// located in the `./migrations` directory using [`sqlx::migrate!`].
+///
+/// # Panics
+/// This function will panic with an error message if:
+/// - It cannot establish an initial connection to the Postgres server.
+/// - The `CREATE DATABASE` query fails (e.g., database already exists or insufficient permissions).
+/// - It cannot connect to the newly created database.
+/// - The migration scripts fail to execute.
+async fn configure_database(config: &DatabaseSettings) {
     // Create database
     let mut connection = PgConnection::connect_with(&config.without_db())
         .await
@@ -74,5 +80,4 @@ async fn configure_database(config: &DatabaseSettings) -> PgPool {
         .run(&connection_pool)
         .await
         .expect("Failed to migrate the database");
-    connection_pool
 }
