@@ -4,9 +4,9 @@ use crate::email_client::EmailClient;
 use crate::startup::ApplicationBaseUrl;
 use actix_web::{HttpResponse, web, web::Data};
 use rand::distr::{Alphanumeric, SampleString};
-use sqlx::PgPool;
 use sqlx::types::Uuid;
 use sqlx::types::chrono::Utc;
+use sqlx::{Executor, PgPool, Postgres};
 
 #[derive(serde::Deserialize)]
 pub struct FormData {
@@ -41,17 +41,26 @@ pub async fn subscribe(
         Ok(subscriber) => subscriber,
         Err(_) => return HttpResponse::BadRequest().finish(),
     };
-    let subscriber_id = match insert_subscriber(&pool, &new_subscriber).await {
+    let mut transaction = match pool.begin().await {
+        Ok(transaction) => transaction,
+        Err(_) => return HttpResponse::InternalServerError().finish(),
+    };
+
+    let subscriber_id = match insert_subscriber(&mut *transaction, &new_subscriber).await {
         Ok(subscriber_id) => subscriber_id,
         Err(_) => return HttpResponse::InternalServerError().finish(),
     };
     let subscription_token = generate_subscription_token();
-    if store_token(&pool, subscriber_id, &subscription_token)
+    if store_token(&mut *transaction, subscriber_id, &subscription_token)
         .await
         .is_err()
     {
         return HttpResponse::InternalServerError().finish();
     };
+    if transaction.commit().await.is_err() {
+        return HttpResponse::InternalServerError().finish();
+    };
+
     if send_confirmation_email(
         &email_client,
         new_subscriber,
@@ -67,21 +76,55 @@ pub async fn subscribe(
 }
 
 #[tracing::instrument(
-    name = "Store subscription token in the database",
-    skip(pool, subscriber_id, subscription_token)
+    name = "Saving new subscriber details in the database",
+    skip(executor, new_subscriber)
 )]
-pub async fn store_token(
-    pool: &PgPool,
+pub async fn insert_subscriber<'a, E>(
+    executor: E,
+    new_subscriber: &NewSubscriber,
+) -> Result<Uuid, sqlx::Error>
+where
+    E: Executor<'a, Database = Postgres>,
+{
+    let subscriber_id = Uuid::new_v4();
+    sqlx::query!(
+        r#"
+        INSERT INTO subscriptions (id, email, name, subscribed_at, status)
+        VALUES ($1, $2, $3, $4, 'pending_confirmation')
+        "#,
+        subscriber_id,
+        new_subscriber.email.as_ref(),
+        new_subscriber.name.as_ref(),
+        Utc::now(),
+    )
+    .execute(executor)
+    .await
+    .map_err(|e| {
+        tracing::error!("Failed to execute query: {:?}", e);
+        e
+    })?;
+    Ok(subscriber_id)
+}
+
+#[tracing::instrument(
+    name = "Store subscription token in the database",
+    skip(executor, subscriber_id, subscription_token)
+)]
+pub async fn store_token<'a, E>(
+    executor: E,
     subscriber_id: Uuid,
     subscription_token: &str,
-) -> Result<(), sqlx::Error> {
+) -> Result<(), sqlx::Error>
+where
+    E: Executor<'a, Database = Postgres>,
+{
     sqlx::query!(
         r#"INSERT INTO subscription_tokens (subscription_token, subscriber_id)
         VALUES ($1, $2)"#,
         subscription_token,
         subscriber_id
     )
-    .execute(pool)
+    .execute(executor)
     .await
     .map_err(|e| {
         tracing::error!("Failed to execute query: {:?}", e);
@@ -116,34 +159,6 @@ async fn send_confirmation_email(
     email_client
         .send_email(new_subscriber.email, "Welcome!", &html_body, &plain_body)
         .await
-}
-
-#[tracing::instrument(
-    name = "Saving new subscriber details in the database",
-    skip(pool, new_subscriber)
-)]
-pub async fn insert_subscriber(
-    pool: &PgPool,
-    new_subscriber: &NewSubscriber,
-) -> Result<Uuid, sqlx::Error> {
-    let subscriber_id = Uuid::new_v4();
-    sqlx::query!(
-        r#"
-        INSERT INTO subscriptions (id, email, name, subscribed_at, status)
-        VALUES ($1, $2, $3, $4, 'pending_confirmation')
-        "#,
-        subscriber_id,
-        new_subscriber.email.as_ref(),
-        new_subscriber.name.as_ref(),
-        Utc::now(),
-    )
-    .execute(pool)
-    .await
-    .map_err(|e| {
-        tracing::error!("Failed to execute query: {:?}", e);
-        e
-    })?;
-    Ok(subscriber_id)
 }
 
 /// Generate a random 25-characters-long case-sensitive subscription token.
