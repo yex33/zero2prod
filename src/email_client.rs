@@ -17,10 +17,7 @@ impl EmailClient {
         timeout: std::time::Duration,
     ) -> Self {
         Self {
-            http_client: Client::builder()
-                .timeout(timeout)
-                .build()
-                .unwrap(),
+            http_client: Client::builder().timeout(timeout).build().unwrap(),
             base_url,
             sender,
             authorization_token,
