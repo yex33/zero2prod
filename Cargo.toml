@@ -12,10 +12,12 @@ name = "zero2prod"
 
 [dev-dependencies]
 claim = "0.5"
-reqwest = "0.13.2"
 fake = "4.4"
 quickcheck = "1.1.0"
 quickcheck_macros = "1.2.0"
+tokio = { version = "1", features = ["macros", "rt"] }
+wiremock = "0.6"
+serde_json = "1"
 
 [dependencies]
 actix-web = "4"
@@ -24,6 +26,7 @@ secrecy = { version = "0.10", features = ["serde"] }
 serde = { version = "1", features = ["derive"] }
 serde-aux = "4.7"
 config = "0.15"
+reqwest = { version = "0.13.2", default-features = false, features = ["json", "rustls"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 tracing = { version = "0.1", features = ["log"] }
 tracing-actix-web = "0.7"
