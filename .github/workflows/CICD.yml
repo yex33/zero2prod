@@ -7,10 +7,10 @@ on:
   push:
     branches:
       - main
-  pull_request:
-    types: [opened, synchronize, reopened]
-    branches:
-      - main
+  # pull_request:
+  #   types: [opened, synchronize, reopened]
+  #   branches:
+  #     - main
 
 env:
   CARGO_TERM_COLOR: always
@@ -23,7 +23,7 @@ env:
 jobs:
   test:
     name: Test
-    runs-on: ubuntu-latest
+    runs-on: arc-runner-set
     # Service containers to run alongside the `test` container job
     services:
       postgres:
@@ -88,7 +88,7 @@ jobs:
   # `fmt` container job
   fmt:
     name: Rustfmt
-    runs-on: ubuntu-latest
+    runs-on: arc-runner-set
     steps:
       - uses: actions/checkout@v4
       - name: Install the Rust toolchain
@@ -100,7 +100,7 @@ jobs:
 
   clippy:
     name: Clippy
-    runs-on: ubuntu-latest
+    runs-on: arc-runner-set
     env:
       SQLX_OFFLINE: true
     steps:
@@ -114,7 +114,7 @@ jobs:
 
   coverage:
     name: Code coverage
-    runs-on: ubuntu-latest
+    runs-on: arc-runner-set
     services:
       postgres:
         image: postgres:14
@@ -167,7 +167,7 @@ jobs:
   build_and_push:
     name: Build and Push to DigitalOcean Container Registry
     needs: [test, fmt, clippy, coverage]
-    runs-on: ubuntu-latest
+    runs-on: arc-runner-set
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -195,7 +195,7 @@ jobs:
   deploy:
     name: Deploy to DigitialOcean Container Registry
     needs: build_and_push
-    runs-on: ubuntu-latest
+    runs-on: arc-runner-set
     steps:
       - name: Install doctl
         uses: digitalocean/action-doctl@v2
