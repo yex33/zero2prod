@@ -40,7 +40,7 @@ async fn the_link_returned_by_subscribe_returns_a_200_if_called() {
 }
 
 #[tokio::test]
-async fn clicking_on_the_confirmation_like_confirms_a_subscriber() {
+async fn clicking_on_the_confirmation_link_confirms_a_subscriber() {
     // Arrange
     let app = spawn_app().await;
     let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
