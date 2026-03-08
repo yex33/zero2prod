@@ -111,24 +111,22 @@ async fn insert_subscriber<'a, E>(
 where
     E: Executor<'a, Database = Postgres>,
 {
-    let subscriber_id = Uuid::new_v4();
-    sqlx::query!(
+    let result = sqlx::query!(
         r#"
         INSERT INTO subscriptions (id, email, name, subscribed_at, status)
         VALUES ($1, $2, $3, $4, 'pending_confirmation')
+        ON CONFLICT (email)
+        DO UPDATE SET name = EXCLUDED.name -- Dummy update to force RETURNING
+        RETURNING id
         "#,
-        subscriber_id,
+        Uuid::new_v4(),
         new_subscriber.email.as_ref(),
         new_subscriber.name.as_ref(),
         Utc::now(),
     )
-    .execute(executor)
-    .await
-    .map_err(|e| {
-        tracing::error!("Failed to execute query: {:?}", e);
-        e
-    })?;
-    Ok(subscriber_id)
+    .fetch_one(executor)
+    .await?;
+    Ok(result.id)
 }
 
 #[tracing::instrument(
