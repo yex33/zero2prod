@@ -11,18 +11,12 @@ use crate::domain::{NewSubscriber, SubscriberEmail, SubscriberName};
 use crate::email_client::EmailClient;
 use crate::startup::ApplicationBaseUrl;
 
-#[derive(thiserror::Error)]
+#[derive(thiserror::Error, Debug)]
 pub enum SubscribeError {
     #[error("{0}")]
     ValidationError(String),
     #[error(transparent)]
     UnexpectedError(#[from] anyhow::Error),
-}
-
-impl std::fmt::Debug for SubscribeError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        error_chain_fmt(self, f)
-    }
 }
 
 impl ResponseError for SubscribeError {
@@ -34,14 +28,10 @@ impl ResponseError for SubscribeError {
     }
 }
 
-#[derive(thiserror::Error)]
-#[error("A database error was encountered while trying to store a subscription token")]
-struct StoreTokenError(#[from] sqlx::Error);
-
-impl std::fmt::Debug for StoreTokenError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        error_chain_fmt(self, f)
-    }
+#[derive(thiserror::Error, Debug)]
+enum StoreTokenError {
+    #[error("A database error was encountered while trying to store a subscription token")]
+    SqlxError(#[from] sqlx::Error),
 }
 
 #[derive(serde::Deserialize)]
@@ -149,7 +139,7 @@ where
     )
     .execute(executor)
     .await
-    .map_err(StoreTokenError)?;
+    .map_err(StoreTokenError::SqlxError)?;
     Ok(())
 }
 
@@ -184,17 +174,4 @@ async fn send_confirmation_email(
 /// Generate a random 25-characters-long case-sensitive subscription token.
 fn generate_subscription_token() -> String {
     Alphanumeric.sample_string(&mut rand::rng(), 25)
-}
-
-fn error_chain_fmt(
-    e: &impl std::error::Error,
-    f: &mut std::fmt::Formatter<'_>,
-) -> std::fmt::Result {
-    writeln!(f, "{}", e)?;
-    let mut current = e.source();
-    while let Some(cause) = current {
-        writeln!(f, "Caused by:\n\t{}", cause)?;
-        current = cause.source();
-    }
-    Ok(())
 }
