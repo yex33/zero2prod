@@ -19,6 +19,16 @@ impl ResponseError for ConfirmationError {
             ConfirmationError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
+
+    // Hide internal error messages from the HTTP response body
+    fn error_response(&self) -> HttpResponse {
+        HttpResponse::build(self.status_code()).body(
+            self.status_code()
+                .canonical_reason()
+                .unwrap_or_default()
+                .to_owned(),
+        )
+    }
 }
 
 #[derive(serde::Deserialize)]

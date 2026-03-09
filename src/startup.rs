@@ -1,12 +1,14 @@
 use crate::configuration::{DatabaseSettings, Settings};
 use crate::email_client::EmailClient;
 use crate::routes::{confirm, health_check, subscribe};
-use actix_web::dev::Server;
-use actix_web::{App, HttpServer, web};
+use actix_web::dev::{Server, ServiceResponse};
+use actix_web::http::header;
+use actix_web::middleware::{ErrorHandlerResponse, ErrorHandlers};
+use actix_web::{App, HttpMessage, HttpServer, web};
 use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;
 use std::net::TcpListener;
-use tracing_actix_web::TracingLogger;
+use tracing_actix_web::{RequestId, TracingLogger};
 
 pub struct Application {
     port: u16,
@@ -76,6 +78,7 @@ pub fn run(
     let server = HttpServer::new(move || {
         App::new()
             .wrap(TracingLogger::default())
+            .wrap(ErrorHandlers::new().default_handler(add_error_handler))
             .route("/health_check", web::get().to(health_check))
             .route("/subscriptions", web::post().to(subscribe))
             .route("/subscriptions/confirm", web::get().to(confirm))
@@ -86,4 +89,27 @@ pub fn run(
     .listen(listener)?
     .run();
     Ok(server)
+}
+
+/// An error handler middleware callback that injects the `x-request-id` header into the response.
+///
+/// This function intercepts a [`ServiceResponse`] and attempts to extract a [`RequestId`]
+/// from the request extensions. If found, the ID is added to the response headers
+/// before being returned to the client.
+///
+/// If a [`RequestId`] is not found in the request extensions (e.g., if the `TracingLogger`
+/// middleware is not active for the current scope), the string `"unknown"` will be
+/// attached to the `x-request-id` header instead.
+fn add_error_handler<B>(mut res: ServiceResponse<B>) -> actix_web::Result<ErrorHandlerResponse<B>> {
+    let request_id = res
+        .request()
+        .extensions()
+        .get::<RequestId>()
+        .map(|id| id.to_string())
+        .unwrap_or_else(|| "unknown".to_string());
+    res.response_mut().headers_mut().insert(
+        header::HeaderName::from_static("x-request-id"),
+        header::HeaderValue::from_str(&request_id)?,
+    );
+    Ok(ErrorHandlerResponse::Response(res.map_into_left_body()))
 }
