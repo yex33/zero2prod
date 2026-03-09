@@ -23,6 +23,7 @@ services:
       - APP_DATABASE__HOST=db
       - APP_DATABASE__PORT=5432
       - APP_DATABASE__REQUIRE_SSL=false
+      - APP_APPLICATION__BASE_URL=127.0.0.1
     depends_on:
       db:
         condition: service_healthy
