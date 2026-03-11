@@ -44,7 +44,7 @@ pub struct Parameters {
 impl TryFrom<Parameters> for SubscriptionToken {
     type Error = String;
     fn try_from(params: Parameters) -> Result<Self, Self::Error> {
-        Ok(SubscriptionToken::parse(params.subscription_token)?)
+        SubscriptionToken::parse(params.subscription_token)
     }
 }
 
