@@ -4,8 +4,12 @@ use anyhow::Context;
 use sqlx::PgPool;
 use uuid::Uuid;
 
+use crate::domain::SubscriptionToken;
+
 #[derive(thiserror::Error, Debug)]
 pub enum ConfirmationError {
+    #[error("{0}")]
+    ValidationError(String),
     #[error("No subscriber is associated with the provided token")]
     UnknownToken,
     #[error(transparent)]
@@ -15,6 +19,7 @@ pub enum ConfirmationError {
 impl ResponseError for ConfirmationError {
     fn status_code(&self) -> StatusCode {
         match self {
+            ConfirmationError::ValidationError(_) => StatusCode::BAD_REQUEST,
             ConfirmationError::UnknownToken => StatusCode::UNAUTHORIZED,
             ConfirmationError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
@@ -36,12 +41,23 @@ pub struct Parameters {
     subscription_token: String,
 }
 
+impl TryFrom<Parameters> for SubscriptionToken {
+    type Error = String;
+    fn try_from(params: Parameters) -> Result<Self, Self::Error> {
+        Ok(SubscriptionToken::parse(params.subscription_token)?)
+    }
+}
+
 #[tracing::instrument(name = "Confirm a pending subscriber", skip(parameters, pool))]
 pub async fn confirm(
     parameters: web::Query<Parameters>,
     pool: web::Data<PgPool>,
 ) -> Result<HttpResponse, ConfirmationError> {
-    let subscriber_id = get_subscriber_id_from_token(&pool, &parameters.subscription_token)
+    let token = parameters
+        .0
+        .try_into()
+        .map_err(ConfirmationError::ValidationError)?;
+    let subscriber_id = get_subscriber_id_from_token(&pool, &token)
         .await
         .context("Failed to retrieve subscriber id from the database")?
         .ok_or(ConfirmationError::UnknownToken)?;
@@ -54,11 +70,11 @@ pub async fn confirm(
 #[tracing::instrument(name = "Get subscriber_id from token", skip(pool, subscription_token))]
 async fn get_subscriber_id_from_token(
     pool: &PgPool,
-    subscription_token: &str,
+    subscription_token: &SubscriptionToken,
 ) -> Result<Option<Uuid>, sqlx::Error> {
     let result = sqlx::query!(
         r#"SELECT subscriber_id FROM subscription_tokens WHERE subscription_token = $1"#,
-        subscription_token
+        subscription_token.as_ref()
     )
     .fetch_optional(pool)
     .await?;

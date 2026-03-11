@@ -2,12 +2,11 @@ use actix_web::http::StatusCode;
 use actix_web::web::Data;
 use actix_web::{HttpResponse, ResponseError, web};
 use anyhow::Context;
-use rand::distr::{Alphanumeric, SampleString};
 use sqlx::types::Uuid;
 use sqlx::types::chrono::Utc;
 use sqlx::{Executor, PgPool, Postgres};
 
-use crate::domain::{NewSubscriber, SubscriberEmail, SubscriberName};
+use crate::domain::{NewSubscriber, SubscriberEmail, SubscriberName, SubscriptionToken};
 use crate::email_client::EmailClient;
 use crate::startup::ApplicationBaseUrl;
 
@@ -81,7 +80,7 @@ pub async fn subscribe(
     let subscriber_id = insert_subscriber(&mut *transaction, &new_subscriber)
         .await
         .context("Failed to insert new subscriber in the database")?;
-    let subscription_token = generate_subscription_token();
+    let subscription_token = SubscriptionToken::new();
     store_token(&mut *transaction, subscriber_id, &subscription_token)
         .await
         .context("Failed to store the confirmation token for a new subscriber")?;
@@ -136,7 +135,7 @@ where
 async fn store_token<'a, E>(
     executor: E,
     subscriber_id: Uuid,
-    subscription_token: &str,
+    subscription_token: &SubscriptionToken,
 ) -> Result<(), StoreTokenError>
 where
     E: Executor<'a, Database = Postgres>,
@@ -144,7 +143,7 @@ where
     sqlx::query!(
         r#"INSERT INTO subscription_tokens (subscription_token, subscriber_id)
         VALUES ($1, $2)"#,
-        subscription_token,
+        subscription_token.as_ref(),
         subscriber_id
     )
     .execute(executor)
@@ -161,11 +160,12 @@ async fn send_confirmation_email(
     email_client: &EmailClient,
     new_subscriber: NewSubscriber,
     base_url: &str,
-    subscription_token: &str,
+    subscription_token: &SubscriptionToken,
 ) -> Result<(), reqwest::Error> {
     let confirmation_link = format!(
         "{}/subscriptions/confirm?subscription_token={}",
-        base_url, subscription_token,
+        base_url,
+        subscription_token.as_ref(),
     );
     let html_body = format!(
         "Welcome to our newsletter!<br />\
@@ -179,9 +179,4 @@ async fn send_confirmation_email(
     email_client
         .send_email(new_subscriber.email, "Welcome!", &html_body, &plain_body)
         .await
-}
-
-/// Generate a random 25-characters-long case-sensitive subscription token.
-fn generate_subscription_token() -> String {
-    Alphanumeric.sample_string(&mut rand::rng(), 25)
 }

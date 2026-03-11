@@ -1,6 +1,7 @@
-use crate::helpers::spawn_app;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, ResponseTemplate};
+
+use crate::helpers::spawn_app;
 
 #[tokio::test]
 async fn confirmations_without_token_are_rejected_with_a_400() {
@@ -17,10 +18,43 @@ async fn confirmations_without_token_are_rejected_with_a_400() {
 }
 
 #[tokio::test]
+async fn confirmation_returns_a_400_for_invalid_token() {
+    // Arrange
+    let app = spawn_app().await;
+    let test_cases = vec![
+        (
+            [("subscription_token", "short0token")],
+            "a token with less than 25 characters",
+        ),
+        (
+            [("subscription_token", "a0very0very0very0very0long0token")],
+            "a token with more than 25 characters",
+        ),
+        (
+            [("subscription_token", "token0with0invalid0char0$")],
+            "a token with an invalid character $",
+        ),
+    ];
+
+    for (query_params, description) in test_cases {
+        // Act
+        let response = app.get_subscriptions_confirm(query_params).await;
+
+        // Assert
+        assert_eq!(
+            400,
+            response.status().as_u16(),
+            "The API did not return a 400 Bad Request when the payload was {}",
+            description
+        );
+    }
+}
+
+#[tokio::test]
 async fn confirmation_returns_a_401_for_well_formatted_but_non_existent_token() {
     // Arrange
     let app = spawn_app().await;
-    let query_params = vec![("subscription_token", "nonexistent_25_char_token")];
+    let query_params = vec![("subscription_token", "nonexistent0250char0token")];
 
     // Act
     let response = app.get_subscriptions_confirm(query_params).await;
