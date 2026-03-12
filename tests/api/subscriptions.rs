@@ -52,35 +52,6 @@ async fn subscribe_persists_the_new_subscriber() {
 }
 
 #[tokio::test]
-async fn subscribe_persists_a_new_subscription_token_for_the_subscriber() {
-    // Arrange
-    let app = spawn_app().await;
-    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
-
-    Mock::given(path("/email"))
-        .and(method("POST"))
-        .respond_with(ResponseTemplate::new(200))
-        .mount(&app.email_server)
-        .await;
-
-    // Act
-    app.post_subscriptions(body.into()).await;
-
-    // Assert
-    let email_request = &app.email_server.received_requests().await.unwrap()[0];
-    let token = app.get_confirmation_token(&email_request);
-    let saved = sqlx::query!(
-        "SELECT subscriber_id FROM subscription_tokens WHERE subscription_token = $1",
-        token
-    )
-    .fetch_optional(&app.db_pool)
-    .await
-    .expect("Failed to fetch saved subscription");
-
-    assert_some!(saved);
-}
-
-#[tokio::test]
 async fn subscribe_fails_if_there_is_a_fatal_database_error() {
     // Arrange
     let app = spawn_app().await;
@@ -190,7 +161,36 @@ async fn subscribe_sends_a_confirmation_email_with_a_link() {
 }
 
 #[tokio::test]
-async fn subscribe_sends_two_confirmation_emails_when_subscribed_twice() {
+async fn subscribe_persists_a_new_subscription_token_for_the_subscriber() {
+    // Arrange
+    let app = spawn_app().await;
+    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+
+    Mock::given(path("/email"))
+        .and(method("POST"))
+        .respond_with(ResponseTemplate::new(200))
+        .mount(&app.email_server)
+        .await;
+
+    // Act
+    app.post_subscriptions(body.into()).await;
+
+    // Assert
+    let email_request = &app.email_server.received_requests().await.unwrap()[0];
+    let token = app.get_confirmation_token(&email_request);
+    let saved = sqlx::query!(
+        "SELECT subscriber_id FROM subscription_tokens WHERE subscription_token = $1",
+        token
+    )
+        .fetch_optional(&app.db_pool)
+        .await
+        .expect("Failed to fetch saved subscription");
+
+    assert_some!(saved);
+}
+
+#[tokio::test]
+async fn subscribe_twice_sends_two_confirmation_emails() {
     // Arrange
     let app = spawn_app().await;
     let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
