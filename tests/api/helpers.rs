@@ -1,6 +1,7 @@
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use std::sync::LazyLock;
-use wiremock::MockServer;
+use wiremock::matchers::{method, path};
+use wiremock::{Mock, MockServer, ResponseTemplate};
 use zero2prod::configuration::{DatabaseSettings, get_configuration};
 use zero2prod::startup::{Application, get_connection_pool};
 use zero2prod::telemetry::{get_subscriber, init_subscriber};
@@ -68,6 +69,26 @@ impl TestApp {
             .find(|(key, _)| key == "subscription_token")
             .map(|(_, value)| value.into_owned())
             .expect("No token in confirmation link")
+    }
+
+    pub async fn create_unconfirmed_subscriber(&self, body: &str) -> wiremock::Request {
+        let _mock_guard = Mock::given(path("/email"))
+            .and(method("POST"))
+            .respond_with(ResponseTemplate::new(200))
+            .named("Created unconfirmed subscriber")
+            .expect(1)
+            .mount_as_scoped(&self.email_server)
+            .await;
+        self.post_subscriptions(body.into())
+            .await
+            .error_for_status()
+            .unwrap();
+        self.email_server
+            .received_requests()
+            .await
+            .unwrap()
+            .pop()
+            .expect("No email request was received by the mock server")
     }
 
     fn get_link(&self, s: &str) -> reqwest::Url {

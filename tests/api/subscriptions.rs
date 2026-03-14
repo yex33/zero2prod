@@ -149,6 +149,7 @@ async fn subscribe_sends_a_confirmation_email_with_a_link() {
     Mock::given(path("/email"))
         .and(method("POST"))
         .respond_with(ResponseTemplate::new(200))
+        .expect(1)
         .mount(&app.email_server)
         .await;
 
@@ -172,6 +173,7 @@ async fn subscribe_persists_a_new_subscription_token_for_the_subscriber() {
     Mock::given(path("/email"))
         .and(method("POST"))
         .respond_with(ResponseTemplate::new(200))
+        .expect(1)
         .mount(&app.email_server)
         .await;
 

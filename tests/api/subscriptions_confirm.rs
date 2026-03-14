@@ -1,6 +1,4 @@
 use claims::assert_none;
-use wiremock::matchers::{method, path};
-use wiremock::{Mock, ResponseTemplate};
 use zero2prod::domain::SubscriptionStatus;
 
 use crate::helpers::spawn_app;
@@ -70,15 +68,7 @@ async fn confirmation_fails_if_there_is_a_fatal_database_error() {
     // Arrange
     let app = spawn_app().await;
     let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
-
-    Mock::given(path("/email"))
-        .and(method("POST"))
-        .respond_with(ResponseTemplate::new(200))
-        .mount(&app.email_server)
-        .await;
-
-    app.post_subscriptions(body.into()).await;
-    let email_request = &app.email_server.received_requests().await.unwrap()[0];
+    let email_request = app.create_unconfirmed_subscriber(body).await;
     let confirmation_links = app.get_confirmation_links(&email_request);
 
     // Sabotage the database
@@ -99,15 +89,7 @@ async fn the_link_returned_by_subscribe_returns_a_200_if_called() {
     // Arrange
     let app = spawn_app().await;
     let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
-
-    Mock::given(path("/email"))
-        .and(method("POST"))
-        .respond_with(ResponseTemplate::new(200))
-        .mount(&app.email_server)
-        .await;
-
-    app.post_subscriptions(body.into()).await;
-    let email_request = &app.email_server.received_requests().await.unwrap()[0];
+    let email_request = app.create_unconfirmed_subscriber(body).await;
     let confirmation_links = app.get_confirmation_links(&email_request);
 
     // Act
@@ -122,15 +104,7 @@ async fn clicking_on_the_confirmation_link_confirms_a_subscriber() {
     // Arrange
     let app = spawn_app().await;
     let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
-
-    Mock::given(path("/email"))
-        .and(method("POST"))
-        .respond_with(ResponseTemplate::new(200))
-        .mount(&app.email_server)
-        .await;
-
-    app.post_subscriptions(body.into()).await;
-    let email_request = &app.email_server.received_requests().await.unwrap()[0];
+    let email_request = app.create_unconfirmed_subscriber(body).await;
     let confirmation_links = app.get_confirmation_links(&email_request);
 
     // Act
@@ -157,15 +131,7 @@ async fn clicking_on_the_confirmation_link_deletes_the_stored_token() {
     // Arrange
     let app = spawn_app().await;
     let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
-
-    Mock::given(path("/email"))
-        .and(method("POST"))
-        .respond_with(ResponseTemplate::new(200))
-        .mount(&app.email_server)
-        .await;
-
-    app.post_subscriptions(body.into()).await;
-    let email_request = &app.email_server.received_requests().await.unwrap()[0];
+    let email_request = app.create_unconfirmed_subscriber(body).await;
     let confirmation_links = app.get_confirmation_links(&email_request);
     let token = app.get_confirmation_token(&email_request);
 
@@ -194,21 +160,14 @@ async fn confirming_with_one_token_deletes_all_tokens_for_that_user() {
     let app = spawn_app().await;
     let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
 
-    Mock::given(path("/email"))
-        .and(method("POST"))
-        .respond_with(ResponseTemplate::new(200))
-        .mount(&app.email_server)
-        .await;
-
-    // Subscribe twice
-    app.post_subscriptions(body.into()).await;
-    app.post_subscriptions(body.into()).await;
-
-    let email_requests = app.email_server.received_requests().await.unwrap();
-    let token_1 = app.get_confirmation_token(&email_requests[0]);
-    let token_2 = app.get_confirmation_token(&email_requests[1]);
+    // Subscribe for the first time
+    let email_request = app.create_unconfirmed_subscriber(body).await;
+    let token_1 = app.get_confirmation_token(&email_request);
+    // Subscribe twice with the same `body`
+    let email_request = app.create_unconfirmed_subscriber(body).await;
+    let token_2 = app.get_confirmation_token(&email_request);
     // Confirm using the second token
-    let confirmation_links = app.get_confirmation_links(&email_requests[1]);
+    let confirmation_links = app.get_confirmation_links(&email_request);
 
     // Act
     reqwest::get(confirmation_links.html)
