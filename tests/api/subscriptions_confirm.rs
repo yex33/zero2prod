@@ -184,3 +184,49 @@ async fn clicking_on_the_confirmation_link_deletes_the_stored_token() {
 
     assert_none!(saved);
 }
+
+#[tokio::test]
+async fn confirming_with_one_token_deletes_all_tokens_for_that_user() {
+    // Arrange
+    let app = spawn_app().await;
+    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+
+    Mock::given(path("/email"))
+        .and(method("POST"))
+        .respond_with(ResponseTemplate::new(200))
+        .mount(&app.email_server)
+        .await;
+
+    // Subscribe twice
+    app.post_subscriptions(body.into()).await;
+    app.post_subscriptions(body.into()).await;
+
+    let email_requests = app.email_server.received_requests().await.unwrap();
+    let token_1 = app.get_confirmation_token(&email_requests[0]);
+    let token_2 = app.get_confirmation_token(&email_requests[1]);
+    // Confirm using the second token
+    let confirmation_links = app.get_confirmation_links(&email_requests[1]);
+
+    // Act
+    reqwest::get(confirmation_links.html)
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap();
+
+    // Assert
+    let saved_tokens = sqlx::query!(
+        "SELECT count(*) as count FROM subscription_tokens WHERE subscription_token IN ($1, $2)",
+        token_1,
+        token_2
+    )
+    .fetch_one(&app.db_pool)
+    .await
+    .expect("Failed to fetch count");
+
+    assert_eq!(
+        saved_tokens.count.unwrap(),
+        0,
+        "All tokens should be deleted."
+    );
+}

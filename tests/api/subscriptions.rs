@@ -182,9 +182,9 @@ async fn subscribe_persists_a_new_subscription_token_for_the_subscriber() {
         "SELECT subscriber_id FROM subscription_tokens WHERE subscription_token = $1",
         token
     )
-        .fetch_optional(&app.db_pool)
-        .await
-        .expect("Failed to fetch saved subscription");
+    .fetch_optional(&app.db_pool)
+    .await
+    .expect("Failed to fetch saved subscription");
 
     assert_some!(saved);
 }
@@ -208,4 +208,48 @@ async fn subscribe_twice_sends_two_confirmation_emails() {
 
     // Assert
     // Mock asserts on drop
+}
+
+#[tokio::test]
+async fn subscribe_twice_persists_two_distinct_tokens() {
+    // Arrange
+    let app = spawn_app().await;
+    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+
+    Mock::given(path("/email"))
+        .and(method("POST"))
+        .respond_with(ResponseTemplate::new(200))
+        .expect(2)
+        .mount(&app.email_server)
+        .await;
+
+    // Act
+    app.post_subscriptions(body.into()).await;
+    app.post_subscriptions(body.into()).await;
+
+    // Assert
+
+    // Extract tokens from both email requests and assert they are different
+    let email_requests = &app.email_server.received_requests().await.unwrap();
+    let token_1 = app.get_confirmation_token(&email_requests[0]);
+    let token_2 = app.get_confirmation_token(&email_requests[1]);
+    assert_ne!(
+        token_1, token_2,
+        "The two generated tokens should be distinct."
+    );
+
+    // Verify both exist in the database
+    let saved_tokens = sqlx::query!(
+        "SELECT subscription_token FROM subscription_tokens WHERE subscription_token IN ($1, $2)",
+        token_1,
+        token_2
+    )
+    .fetch_all(&app.db_pool)
+    .await
+    .expect("Failed to fetch saved subscription tokens");
+    assert_eq!(
+        saved_tokens.len(),
+        2,
+        "Expected 2 tokens to be persisted in the database."
+    );
 }

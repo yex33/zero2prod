@@ -69,7 +69,7 @@ pub async fn confirm(
             confirm_subscriber(transaction.as_mut(), subscriber_id)
                 .await
                 .context("Failed to update the subscriber's status")?;
-            delete_subscription_token(transaction.as_mut(), &token)
+            delete_subscription_tokens_for_user(transaction.as_mut(), &token)
                 .await
                 .context("Failed to delete the subscription token")?;
             transaction.commit().await.context(
@@ -115,8 +115,11 @@ where
     Ok(())
 }
 
-#[tracing::instrument(name = "Delete used subscription token", skip(executor, token))]
-async fn delete_subscription_token<'a, E>(
+#[tracing::instrument(
+    name = "Delete all subscription tokens for user",
+    skip(executor, token)
+)]
+async fn delete_subscription_tokens_for_user<'a, E>(
     executor: E,
     token: &SubscriptionToken,
 ) -> Result<(), sqlx::Error>
@@ -124,7 +127,14 @@ where
     E: Executor<'a, Database = Postgres>,
 {
     sqlx::query!(
-        r#"DELETE FROM subscription_tokens WHERE subscription_token = $1"#,
+        r#"
+        DELETE FROM subscription_tokens
+        WHERE subscriber_id = (
+            SELECT subscriber_id
+            FROM subscription_tokens
+            WHERE subscription_token = $1
+        )
+        "#,
         token.as_ref(),
     )
     .execute(executor)
