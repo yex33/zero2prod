@@ -4,7 +4,7 @@ use anyhow::Context;
 use sqlx::{Executor, PgPool, Postgres};
 use uuid::Uuid;
 
-use crate::domain::SubscriptionToken;
+use crate::domain::{SubscriptionStatus, SubscriptionToken};
 
 #[derive(thiserror::Error, Debug)]
 pub enum ConfirmationError {
@@ -107,8 +107,9 @@ where
     E: Executor<'a, Database = Postgres>,
 {
     sqlx::query!(
-        r#"UPDATE subscriptions SET status = 'confirmed' WHERE id = $1"#,
-        subscriber_id
+        r#"UPDATE subscriptions SET status = $1 WHERE id = $2"#,
+        SubscriptionStatus::Confirmed as SubscriptionStatus,
+        subscriber_id,
     )
     .execute(executor)
     .await?;

@@ -6,7 +6,9 @@ use sqlx::types::Uuid;
 use sqlx::types::chrono::Utc;
 use sqlx::{Executor, PgPool, Postgres};
 
-use crate::domain::{NewSubscriber, SubscriberEmail, SubscriberName, SubscriptionToken};
+use crate::domain::{
+    NewSubscriber, SubscriberEmail, SubscriberName, SubscriptionStatus, SubscriptionToken,
+};
 use crate::email_client::EmailClient;
 use crate::startup::ApplicationBaseUrl;
 
@@ -113,7 +115,7 @@ where
     let result = sqlx::query!(
         r#"
         INSERT INTO subscriptions (id, email, name, subscribed_at, status)
-        VALUES ($1, $2, $3, $4, 'pending_confirmation')
+        VALUES ($1, $2, $3, $4, $5)
         ON CONFLICT (email)
         DO UPDATE SET name = EXCLUDED.name -- Dummy update to force RETURNING
         RETURNING id
@@ -122,6 +124,7 @@ where
         new_subscriber.email.as_ref(),
         new_subscriber.name.as_ref(),
         Utc::now(),
+        SubscriptionStatus::PendingConfirmation as SubscriptionStatus,
     )
     .fetch_one(executor)
     .await?;

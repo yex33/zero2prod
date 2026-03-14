@@ -1,6 +1,7 @@
 use claims::assert_none;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, ResponseTemplate};
+use zero2prod::domain::SubscriptionStatus;
 
 use crate::helpers::spawn_app;
 
@@ -140,13 +141,15 @@ async fn clicking_on_the_confirmation_link_confirms_a_subscriber() {
         .unwrap();
 
     // Assert
-    let saved = sqlx::query!("SELECT email, name, status FROM subscriptions")
-        .fetch_one(&app.db_pool)
-        .await
-        .expect("Failed to fetch saved subscription");
+    let saved = sqlx::query!(
+        r#"SELECT email, name, status AS "status: SubscriptionStatus" FROM subscriptions"#
+    )
+    .fetch_one(&app.db_pool)
+    .await
+    .expect("Failed to fetch saved subscription");
     assert_eq!(saved.email, "ursula_le_guin@gmail.com");
     assert_eq!(saved.name, "le guin");
-    assert_eq!(saved.status, "confirmed");
+    assert_eq!(saved.status, SubscriptionStatus::Confirmed);
 }
 
 #[tokio::test]

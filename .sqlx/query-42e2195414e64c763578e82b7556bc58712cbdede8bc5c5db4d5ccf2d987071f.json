@@ -1,0 +1,42 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT email, name, status AS \"status: SubscriptionStatus\" FROM subscriptions",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "email",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "status: SubscriptionStatus",
+        "type_info": {
+          "Custom": {
+            "name": "subscription_status",
+            "kind": {
+              "Enum": [
+                "pending_confirmation",
+                "confirmed"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "42e2195414e64c763578e82b7556bc58712cbdede8bc5c5db4d5ccf2d987071f"
+}
