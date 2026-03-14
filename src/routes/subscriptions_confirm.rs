@@ -59,26 +59,23 @@ pub async fn confirm(
         .map_err(ConfirmationError::ValidationError)?;
     let subscriber_id = get_subscriber_id_from_token(pool.as_ref(), &token)
         .await
-        .context("Failed to retrieve subscriber id from the database")?;
-    match subscriber_id {
-        Some(subscriber_id) => {
-            let mut transaction = pool
-                .begin()
-                .await
-                .context("Failed to acquire a Postgres connection from the pool")?;
-            confirm_subscriber(transaction.as_mut(), subscriber_id)
-                .await
-                .context("Failed to update the subscriber's status")?;
-            delete_subscription_tokens_for_user(transaction.as_mut(), &token)
-                .await
-                .context("Failed to delete the subscription token")?;
-            transaction.commit().await.context(
-                "Failed to commit the transaction to confirm the status of the subscriber",
-            )?;
-            Ok(HttpResponse::Ok().finish())
-        }
-        None => Err(ConfirmationError::UnknownToken),
-    }
+        .context("Failed to retrieve subscriber id from the database")?
+        .ok_or(ConfirmationError::UnknownToken)?;
+    let mut transaction = pool
+        .begin()
+        .await
+        .context("Failed to acquire a Postgres connection from the pool")?;
+    confirm_subscriber(transaction.as_mut(), subscriber_id)
+        .await
+        .context("Failed to update the subscriber's status")?;
+    delete_subscription_tokens_for_user(transaction.as_mut(), &token)
+        .await
+        .context("Failed to delete the subscription token")?;
+    transaction
+        .commit()
+        .await
+        .context("Failed to commit the transaction to confirm the status of the subscriber")?;
+    Ok(HttpResponse::Ok().finish())
 }
 
 #[tracing::instrument(
