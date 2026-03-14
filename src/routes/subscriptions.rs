@@ -79,11 +79,11 @@ pub async fn subscribe(
         .begin()
         .await
         .context("Failed to acquire a Postgres connection from the pool")?;
-    let subscriber_id = insert_subscriber(&mut *transaction, &new_subscriber)
+    let subscriber_id = insert_subscriber(transaction.as_mut(), &new_subscriber)
         .await
         .context("Failed to insert new subscriber in the database")?;
     let subscription_token = SubscriptionToken::new();
-    store_token(&mut *transaction, subscriber_id, &subscription_token)
+    store_token(transaction.as_mut(), subscriber_id, &subscription_token)
         .await
         .context("Failed to store the confirmation token for a new subscriber")?;
     transaction
