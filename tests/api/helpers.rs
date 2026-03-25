@@ -91,6 +91,16 @@ impl TestApp {
             .expect("No email request was received by the mock server")
     }
 
+    pub async fn create_confirmed_subscriber(&self, body: &str) {
+        let email_request = self.create_unconfirmed_subscriber(body).await;
+        let confirmation_links = self.get_confirmation_links(&email_request);
+        reqwest::get(confirmation_links.html)
+            .await
+            .unwrap()
+            .error_for_status()
+            .unwrap();
+    }
+
     fn get_link(&self, s: &str) -> reqwest::Url {
         let links: Vec<_> = linkify::LinkFinder::new()
             .links(s)
@@ -103,6 +113,15 @@ impl TestApp {
         assert_eq!(confirmation_link.host_str().unwrap(), "127.0.0.1");
         confirmation_link.set_port(Some(self.port)).unwrap();
         confirmation_link
+    }
+
+    pub async fn post_newsletters(&self, body: serde_json::Value) -> reqwest::Response {
+        reqwest::Client::new()
+            .post(&format!("{}/newsletters", &self.address))
+            .json(&body)
+            .send()
+            .await
+            .expect("Failed to execute request")
     }
 }
 
