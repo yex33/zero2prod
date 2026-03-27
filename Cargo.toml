@@ -39,6 +39,7 @@ thiserror = "2"
 anyhow = "1"
 unicode-segmentation = "1.12"
 validator = "0.20"
+base64 = "0.22"
 
 [dependencies.sqlx]
 version = "0.8"
