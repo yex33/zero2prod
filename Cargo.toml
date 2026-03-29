@@ -12,7 +12,7 @@ name = "zero2prod"
 
 [dev-dependencies]
 claims = "0.8"
-fake = "4.4"
+fake = "5.1"
 quickcheck = "1.1.0"
 quickcheck_macros = "1.2.0"
 tokio = { version = "1", features = ["macros", "rt"] }
@@ -40,6 +40,7 @@ anyhow = "1"
 unicode-segmentation = "1.12"
 validator = "0.20"
 base64 = "0.22"
+sha3 = "0.10"
 
 [dependencies.sqlx]
 version = "0.8"
