@@ -40,7 +40,7 @@ anyhow = "1"
 unicode-segmentation = "1.12"
 validator = "0.20"
 base64 = "0.22"
-sha3 = "0.10"
+argon2 = { version = "0.5", features = ["std"] }
 
 [dependencies.sqlx]
 version = "0.8"
