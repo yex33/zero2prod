@@ -18,7 +18,7 @@ quickcheck_macros = "1.2.0"
 tokio = { version = "1", features = ["macros", "rt"] }
 wiremock = "0.6"
 serde_json = "1"
-linkify = "0.10"
+linkify = "0.11"
 
 [dependencies]
 actix-web = "4"
@@ -27,7 +27,6 @@ secrecy = { version = "0.10", features = ["serde"] }
 serde = { version = "1", features = ["derive"] }
 serde-aux = "4.7"
 config = "0.15"
-reqwest = { version = "0.13.2", default-features = false, features = ["json", "rustls", "query"] }
 rand = { version = "0.10", features = ["std_rng"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 tracing = { version = "0.1", features = ["log"] }
@@ -37,19 +36,24 @@ tracing-subscriber = { version = "0.3", features = ["registry", "env-filter"] }
 tracing-bunyan-formatter = "0.3"
 thiserror = "2"
 anyhow = "1"
-unicode-segmentation = "1.12"
+unicode-segmentation = "1.13"
 validator = "0.20"
 base64 = "0.22"
 argon2 = { version = "0.5", features = ["std"] }
+
+[dependencies.reqwest]
+version = "0.13.2"
+default-features = false
+features = ["json", "rustls", "query"]
 
 [dependencies.sqlx]
 version = "0.8"
 default-features = false
 features = [
-    "runtime-tokio-rustls",
-    "macros",
-    "postgres",
-    "uuid",
-    "chrono",
-    "migrate"
+  "runtime-tokio-rustls",
+  "macros",
+  "postgres",
+  "uuid",
+  "chrono",
+  "migrate",
 ]
