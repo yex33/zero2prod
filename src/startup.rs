@@ -2,6 +2,7 @@ use actix_web::dev::{Server, ServiceResponse};
 use actix_web::http::header;
 use actix_web::middleware::{ErrorHandlerResponse, ErrorHandlers};
 use actix_web::{App, HttpMessage, HttpServer, web};
+use secrecy::SecretString;
 use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;
 use std::net::TcpListener;
@@ -17,6 +18,10 @@ pub struct Application {
     port: u16,
     server: Server,
 }
+
+// Wrapper on primitive types to avoid conflicts in application states
+pub struct ApplicationBaseUrl(pub String);
+pub struct HmacSecret(pub SecretString);
 
 impl Application {
     pub async fn build(configuration: Settings) -> Result<Self, std::io::Error> {
@@ -45,6 +50,7 @@ impl Application {
             connection_pool,
             email_client,
             configuration.application.base_url,
+            configuration.application.hmac_secret,
         )?;
 
         Ok(Self { port, server })
@@ -65,19 +71,17 @@ pub fn get_connection_pool(configuration: &DatabaseSettings) -> PgPool {
         .connect_lazy_with(configuration.with_db())
 }
 
-// Wrapper type in order to retrieve the URL from the context.
-// Using a raw [`String`] would expose us to conflicts.
-pub struct ApplicationBaseUrl(pub String);
-
 pub fn run(
     listener: TcpListener,
     db_pool: PgPool,
     email_client: EmailClient,
     base_url: String,
+    hmac_secret: SecretString,
 ) -> Result<Server, std::io::Error> {
     let db_pool = web::Data::new(db_pool);
     let email_client = web::Data::new(email_client);
     let base_url = web::Data::new(ApplicationBaseUrl(base_url));
+    let hmac_secret = web::Data::new(HmacSecret(hmac_secret));
     let server = HttpServer::new(move || {
         App::new()
             .wrap(TracingLogger::default())
@@ -92,6 +96,7 @@ pub fn run(
             .app_data(db_pool.clone())
             .app_data(email_client.clone())
             .app_data(base_url.clone())
+            .app_data(hmac_secret.clone())
     })
     .listen(listener)?
     .run();
