@@ -182,7 +182,7 @@ async fn subscribe_persists_a_new_subscription_token_for_the_subscriber() {
 
     // Assert
     let email_request = &app.email_server.received_requests().await.unwrap()[0];
-    let token = app.get_confirmation_token(&email_request);
+    let token = app.get_confirmation_token(email_request);
     let saved = sqlx::query!(
         "SELECT subscriber_id FROM subscription_tokens WHERE subscription_token = $1",
         token

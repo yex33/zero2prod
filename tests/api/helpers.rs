@@ -44,7 +44,7 @@ pub struct TestUser {
 impl TestApp {
     pub async fn post_subscriptions(&self, body: String) -> reqwest::Response {
         reqwest::Client::new()
-            .post(&format!("{}/subscriptions", &self.address))
+            .post(format!("{}/subscriptions", &self.address))
             .header("Content-Type", "application/x-www-form-urlencoded")
             .body(body)
             .send()
@@ -57,7 +57,7 @@ impl TestApp {
         query_params: T,
     ) -> reqwest::Response {
         reqwest::Client::new()
-            .get(&format!("{}/subscriptions/confirm", &self.address))
+            .get(format!("{}/subscriptions/confirm", &self.address))
             .query(&query_params)
             .send()
             .await
@@ -67,15 +67,15 @@ impl TestApp {
     pub fn get_confirmation_links(&self, email_request: &wiremock::Request) -> ConfirmationLinks {
         let body: serde_json::Value = serde_json::from_slice(&email_request.body).unwrap();
         // Extract the link from one of the request fields
-        let html = self.get_link(&body["HtmlBody"].as_str().unwrap());
-        let plain_text = self.get_link(&body["TextBody"].as_str().unwrap());
+        let html = self.get_link(body["HtmlBody"].as_str().unwrap());
+        let plain_text = self.get_link(body["TextBody"].as_str().unwrap());
         ConfirmationLinks { html, plain_text }
     }
 
     // Currently extracts subscription token exclusively from the HtmlBody, neglecting the TextBody
     pub fn get_confirmation_token(&self, email_request: &wiremock::Request) -> String {
         let body: serde_json::Value = serde_json::from_slice(&email_request.body).unwrap();
-        let url = self.get_link(&body["HtmlBody"].as_str().unwrap());
+        let url = self.get_link(body["HtmlBody"].as_str().unwrap());
         url.query_pairs()
             .find(|(key, _)| key == "subscription_token")
             .map(|(_, value)| value.into_owned())
@@ -128,7 +128,7 @@ impl TestApp {
 
     pub async fn post_newsletters(&self, body: serde_json::Value) -> reqwest::Response {
         reqwest::Client::new()
-            .post(&format!("{}/newsletters", &self.address))
+            .post(format!("{}/newsletters", &self.address))
             // random credential for now
             .basic_auth(&self.test_user.username, Some(&self.test_user.password))
             .json(&body)
@@ -212,9 +212,9 @@ pub async fn spawn_app() -> TestApp {
 ///
 /// This function performs two main orchestration steps:
 /// 1. **Creation**: Connects to the PostgreSQL server to execute a `CREATE DATABASE` command using
-/// the name provided in the `config`.
+///    the name provided in the `config`.
 /// 2. **Migration**: Connects to the newly created database and runs all pending SQL migrations
-/// located in the `./migrations` directory using [`sqlx::migrate!`].
+///    located in the `./migrations` directory using [`sqlx::migrate!`].
 ///
 /// # Panics
 /// This function will panic with an error message if:

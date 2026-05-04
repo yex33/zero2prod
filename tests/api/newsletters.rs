@@ -111,7 +111,7 @@ async fn requests_missing_authorization_are_rejected() {
 
     // Act
     let response = reqwest::Client::new()
-        .post(&format!("{}/newsletters", &app.address))
+        .post(format!("{}/newsletters", &app.address))
         .json(&body)
         .send()
         .await
@@ -135,7 +135,7 @@ async fn non_existing_user_is_rejected() {
 
     // Act
     let response = reqwest::Client::new()
-        .post(&format!("{}/newsletters", &app.address))
+        .post(format!("{}/newsletters", &app.address))
         .basic_auth(username, Some(password))
         .json(&serde_json::json!({
             "title": "Newsletter title",
@@ -167,7 +167,7 @@ async fn invalid_password_is_rejected() {
 
     // Act
     let response = reqwest::Client::new()
-        .post(&format!("{}/newsletters", &app.address))
+        .post(format!("{}/newsletters", &app.address))
         .basic_auth(username, Some(password))
         .json(&serde_json::json!({
             "title": "Newsletter title",
