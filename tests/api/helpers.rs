@@ -129,12 +129,26 @@ impl TestApp {
     pub async fn post_newsletters(&self, body: serde_json::Value) -> reqwest::Response {
         reqwest::Client::new()
             .post(format!("{}/newsletters", &self.address))
-            // random credential for now
             .basic_auth(&self.test_user.username, Some(&self.test_user.password))
             .json(&body)
             .send()
             .await
             .expect("Failed to execute request")
+    }
+
+    pub async fn post_login<Body>(&self, body: &Body) -> reqwest::Response
+    where
+        Body: serde::Serialize,
+    {
+        reqwest::Client::builder()
+            .redirect(reqwest::redirect::Policy::none())
+            .build()
+            .unwrap()
+            .post(format!("{}/login", &self.address))
+            .form(body)
+            .send()
+            .await
+            .expect("Failed to except request.")
     }
 }
 
@@ -206,6 +220,12 @@ pub async fn spawn_app() -> TestApp {
     };
     test_app.test_user.store(&test_app.db_pool).await;
     test_app
+}
+
+/// Asserts the response is a redirection to a location
+pub fn assert_is_redirect_to(response: &reqwest::Response, location: &str) {
+    assert_eq!(response.status().as_u16(), 303);
+    assert_eq!(response.headers().get("Location").unwrap(), location);
 }
 
 /// Bootstraps a fresh database instance for the application.
