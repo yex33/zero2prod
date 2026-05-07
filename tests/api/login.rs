@@ -11,14 +11,9 @@ async fn an_error_flash_message_is_set_on_failure() {
         "password": "random-password",
     });
     let response = app.post_login(&login_body).await;
-    let flash_cookie = response
-        .cookies()
-        .find(|c| c.name() == "_flash")
-        .expect("Failed to find _flash cookie");
 
     // Assert
     assert_is_redirect_to(&response, "/login");
-    assert_eq!(flash_cookie.value(), "Authentication failed");
 
     // Act Part 2: Follow the redirect
     let html_page = app.get_login_html().await;

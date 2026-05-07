@@ -1,13 +1,17 @@
-use actix_web::cookie::Cookie;
+use actix_web::HttpResponse;
 use actix_web::http::header::ContentType;
-use actix_web::{HttpRequest, HttpResponse};
+use actix_web_flash_messages::{IncomingFlashMessages, Level};
 
-pub async fn login_form(request: HttpRequest) -> HttpResponse {
-    let error_html = match request.cookie("_flash") {
-        None => "".into(),
-        Some(cookie) => format!(/* html */ "<p><i>{}</i></p>", cookie.value()),
-    };
-    let mut response = HttpResponse::Ok()
+pub async fn login_form(flash_messages: IncomingFlashMessages) -> HttpResponse {
+    let error_html = flash_messages
+        .iter()
+        .filter_map(|m| {
+            (m.level() == Level::Error)
+                .then(|| format!(/* html */ "<p><i>{}</i></p>", m.content()))
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    HttpResponse::Ok()
         .content_type(ContentType::html())
         .body(format!(
             /* html */
@@ -33,9 +37,5 @@ pub async fn login_form(request: HttpRequest) -> HttpResponse {
 </body>
 </html>
         "#,
-        ));
-    response
-        .add_removal_cookie(&Cookie::new("_flash", ""))
-        .unwrap();
-    response
+        ))
 }

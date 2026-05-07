@@ -1,8 +1,11 @@
+use actix_web::cookie::Key;
 use actix_web::dev::{Server, ServiceResponse};
 use actix_web::http::header;
 use actix_web::middleware::{ErrorHandlerResponse, ErrorHandlers};
 use actix_web::{App, HttpMessage, HttpServer, web};
-use secrecy::SecretString;
+use actix_web_flash_messages::FlashMessagesFramework;
+use actix_web_flash_messages::storage::CookieMessageStore;
+use secrecy::{ExposeSecret, SecretString};
 use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;
 use std::net::TcpListener;
@@ -81,9 +84,12 @@ pub fn run(
     let db_pool = web::Data::new(db_pool);
     let email_client = web::Data::new(email_client);
     let base_url = web::Data::new(ApplicationBaseUrl(base_url));
-    let hmac_secret = web::Data::new(HmacSecret(hmac_secret));
+    let message_store =
+        CookieMessageStore::builder(Key::from(hmac_secret.expose_secret().as_bytes())).build();
+    let message_framework = FlashMessagesFramework::builder(message_store).build();
     let server = HttpServer::new(move || {
         App::new()
+            .wrap(message_framework.clone())
             .wrap(TracingLogger::default())
             .wrap(ErrorHandlers::new().default_handler(add_error_handler))
             .route("/health_check", web::get().to(health_check))
@@ -96,7 +102,6 @@ pub fn run(
             .app_data(db_pool.clone())
             .app_data(email_client.clone())
             .app_data(base_url.clone())
-            .app_data(hmac_secret.clone())
     })
     .listen(listener)?
     .run();
