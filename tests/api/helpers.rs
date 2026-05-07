@@ -28,6 +28,7 @@ pub struct TestApp {
     pub db_pool: PgPool,
     pub email_server: MockServer,
     pub test_user: TestUser,
+    pub api_client: reqwest::Client,
 }
 
 pub struct ConfirmationLinks {
@@ -43,7 +44,7 @@ pub struct TestUser {
 
 impl TestApp {
     pub async fn post_subscriptions(&self, body: String) -> reqwest::Response {
-        reqwest::Client::new()
+        self.api_client
             .post(format!("{}/subscriptions", &self.address))
             .header("Content-Type", "application/x-www-form-urlencoded")
             .body(body)
@@ -56,7 +57,7 @@ impl TestApp {
         &self,
         query_params: T,
     ) -> reqwest::Response {
-        reqwest::Client::new()
+        self.api_client
             .get(format!("{}/subscriptions/confirm", &self.address))
             .query(&query_params)
             .send()
@@ -105,11 +106,46 @@ impl TestApp {
     pub async fn create_confirmed_subscriber(&self, body: &str) {
         let email_request = self.create_unconfirmed_subscriber(body).await;
         let confirmation_links = self.get_confirmation_links(&email_request);
-        reqwest::get(confirmation_links.html)
+        self.api_client
+            .get(confirmation_links.html)
+            .send()
             .await
             .unwrap()
             .error_for_status()
             .unwrap();
+    }
+
+    pub async fn post_newsletters(&self, body: serde_json::Value) -> reqwest::Response {
+        self.api_client
+            .post(format!("{}/newsletters", &self.address))
+            .basic_auth(&self.test_user.username, Some(&self.test_user.password))
+            .json(&body)
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
+
+    pub async fn post_login<Body>(&self, body: &Body) -> reqwest::Response
+    where
+        Body: serde::Serialize,
+    {
+        self.api_client
+            .post(format!("{}/login", &self.address))
+            .form(body)
+            .send()
+            .await
+            .expect("Failed to except request.")
+    }
+
+    pub async fn get_login_html(&self) -> String {
+        self.api_client
+            .get(format!("{}/login", &self.address))
+            .send()
+            .await
+            .expect("Failed to execute request")
+            .text()
+            .await
+            .unwrap()
     }
 
     fn get_link(&self, s: &str) -> reqwest::Url {
@@ -124,31 +160,6 @@ impl TestApp {
         assert_eq!(confirmation_link.host_str().unwrap(), "127.0.0.1");
         confirmation_link.set_port(Some(self.port)).unwrap();
         confirmation_link
-    }
-
-    pub async fn post_newsletters(&self, body: serde_json::Value) -> reqwest::Response {
-        reqwest::Client::new()
-            .post(format!("{}/newsletters", &self.address))
-            .basic_auth(&self.test_user.username, Some(&self.test_user.password))
-            .json(&body)
-            .send()
-            .await
-            .expect("Failed to execute request")
-    }
-
-    pub async fn post_login<Body>(&self, body: &Body) -> reqwest::Response
-    where
-        Body: serde::Serialize,
-    {
-        reqwest::Client::builder()
-            .redirect(reqwest::redirect::Policy::none())
-            .build()
-            .unwrap()
-            .post(format!("{}/login", &self.address))
-            .form(body)
-            .send()
-            .await
-            .expect("Failed to except request.")
     }
 }
 
@@ -209,6 +220,11 @@ pub async fn spawn_app() -> TestApp {
         .expect("Failed to build application");
     let address = format!("http://127.0.0.1:{}", application.port());
     let port = application.port();
+    let api_client = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .cookie_store(true)
+        .build()
+        .unwrap();
 
     let _ = tokio::spawn(application.run_until_stopped());
     let test_app = TestApp {
@@ -217,6 +233,7 @@ pub async fn spawn_app() -> TestApp {
         db_pool: get_connection_pool(&configuration.database),
         email_server,
         test_user: TestUser::generate(),
+        api_client,
     };
     test_app.test_user.store(&test_app.db_pool).await;
     test_app
