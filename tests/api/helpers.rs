@@ -148,6 +148,17 @@ impl TestApp {
             .unwrap()
     }
 
+    pub async fn get_admin_dashboard(&self) -> String {
+        self.api_client
+            .get(format!("{}/admin/dashboard", &self.address))
+            .send()
+            .await
+            .expect("Failed to execute request")
+            .text()
+            .await
+            .unwrap()
+    }
+
     fn get_link(&self, s: &str) -> reqwest::Url {
         let links: Vec<_> = linkify::LinkFinder::new()
             .links(s)
