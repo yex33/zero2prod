@@ -5,10 +5,8 @@ use actix_web_flash_messages::{IncomingFlashMessages, Level};
 pub async fn login_form(flash_messages: IncomingFlashMessages) -> HttpResponse {
     let error_html = flash_messages
         .iter()
-        .filter_map(|m| {
-            (m.level() == Level::Error)
-                .then(|| format!(/* html */ "<p><i>{}</i></p>", m.content()))
-        })
+        .filter(|&m| m.level() == Level::Error)
+        .map(|m| format!(/* html */ "<p><i>{}</i></p>", m.content()))
         .collect::<Vec<_>>()
         .join("\n");
     HttpResponse::Ok()
