@@ -22,6 +22,7 @@ linkify = "0.11"
 [dependencies]
 actix-web = "4"
 actix-web-flash-messages = { version = "0.5", features = ["cookies"] }
+actix-web-lab = "0.26"
 actix-session = { version = "0.11", features = ["redis-session-rustls"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 secrecy = { version = "0.10", features = ["serde"] }
@@ -51,10 +52,11 @@ default-features = false
 features = ["json", "rustls", "query", "form", "cookies"]
 
 [dependencies.sqlx]
-version = "0.8"
+version = "0.9"
 default-features = false
 features = [
-  "runtime-tokio-rustls",
+  "runtime-tokio",
+  "tls-rustls",
   "macros",
   "postgres",
   "uuid",

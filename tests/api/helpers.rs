@@ -308,8 +308,9 @@ async fn configure_database(config: &DatabaseSettings) {
     let mut connection = PgConnection::connect_with(&config.without_db())
         .await
         .expect("Failed to connect to Postgres");
+    let query = format!(r#"CREATE DATABASE "{}";"#, config.database_name);
     connection
-        .execute(format!(r#"CREATE DATABASE "{}";"#, config.database_name).as_str())
+        .execute(sqlx::query(sqlx::AssertSqlSafe(query)))
         .await
         .expect("Failed to create database");
 
