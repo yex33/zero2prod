@@ -1,4 +1,4 @@
-FROM lukemathwalker/cargo-chef:0.1.73-rust-1.93.1-trixie AS chef
+FROM lukemathwalker/cargo-chef:0.1.77-rust-1.96.0-trixie AS chef
 WORKDIR /app
 ENV CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse
 
