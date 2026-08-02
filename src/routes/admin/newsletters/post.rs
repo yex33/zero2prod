@@ -3,14 +3,17 @@ use actix_web_flash_messages::FlashMessage;
 use anyhow::Context;
 use sqlx::PgPool;
 
+use crate::authentication::UserId;
 use crate::domain::{SubscriberEmail, SubscriptionStatus};
 use crate::email_client::EmailClient;
-use crate::utils::{e500, see_other};
+use crate::idempotency::{IdempotencyKey, get_saved_response, save_response};
+use crate::utils::{e400, e500, see_other};
 
 #[derive(serde::Deserialize)]
 pub struct BodyData {
     title: String,
     content: Content,
+    idempotency_key: String,
 }
 
 #[derive(serde::Deserialize)]
@@ -24,7 +27,22 @@ pub async fn publish_newsletter(
     body: web::Json<BodyData>,
     pool: web::Data<PgPool>,
     email_client: web::Data<EmailClient>,
+    user_id: web::ReqData<UserId>,
 ) -> Result<HttpResponse, actix_web::Error> {
+    let BodyData {
+        title,
+        content,
+        idempotency_key,
+    } = body.0;
+    let user_id = user_id.into_inner();
+    let idempotency_key: IdempotencyKey = idempotency_key.try_into().map_err(e400)?;
+    if let Some(saved_response) = get_saved_response(&pool, &idempotency_key, *user_id)
+        .await
+        .map_err(e500)?
+    {
+        FlashMessage::info("The newsletter issue has been published!").send();
+        return Ok(saved_response);
+    }
     let subscribers = get_confirmed_subscribers(&pool)
         .await
         .context("Failed to fetch confirmed subscribers")
@@ -33,12 +51,7 @@ pub async fn publish_newsletter(
         match subscriber {
             Ok(subscriber) => {
                 email_client
-                    .send_email(
-                        &subscriber.email,
-                        &body.title,
-                        &body.content.html,
-                        &body.content.text,
-                    )
+                    .send_email(&subscriber.email, &title, &content.html, &content.text)
                     .await
                     .with_context(|| {
                         format!("Failed to send newsletter issue to {}", subscriber.email)
@@ -56,7 +69,11 @@ pub async fn publish_newsletter(
         }
     }
     FlashMessage::info("The newsletter issue has been published!").send();
-    Ok(see_other("/admin/newsletter"))
+    let response = see_other("/admin/newsletter");
+    let response = save_response(&pool, &idempotency_key, *user_id, response)
+        .await
+        .map_err(e500)?;
+    Ok(response)
 }
 
 struct ConfirmedSubscriber {

@@ -10,6 +10,7 @@ pub async fn publish_newsletter_form(
         .map(|msg| format!(/* html */ "<p><i>{}</i></p>", msg.content()))
         .collect::<Vec<_>>()
         .join("\n");
+    let idempotency_key = uuid::Uuid::new_v4();
 
     Ok(HttpResponse::Ok()
         .content_type(ContentType::html())
@@ -50,6 +51,7 @@ pub async fn publish_newsletter_form(
             ></textarea>
         </label>
         <br>
+        <input hidden type="text" name="idempotency_key" value="{idempotency_key}">
         <button type="submit">Publish</button>
     </form>
     <p><a href="/admin/dashboard">&lt;- Back</a></p></body>
