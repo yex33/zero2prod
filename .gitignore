@@ -5,3 +5,4 @@
 .env
 .sqlfluff
 .editorconfig
+postgres-language-server.jsonc
