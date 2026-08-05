@@ -3,10 +3,13 @@ use argon2::password_hash::rand_core::OsRng;
 use argon2::{Algorithm, Argon2, Params, PasswordHasher, Version};
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use std::sync::LazyLock;
+use std::time::Duration;
 use uuid::Uuid;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 use zero2prod::configuration::{DatabaseSettings, get_configuration};
+use zero2prod::email_client::EmailClient;
+use zero2prod::issue_delivery_worker::{ExecutionOutcome, try_execute_task};
 use zero2prod::startup::{Application, get_connection_pool};
 use zero2prod::telemetry::{get_subscriber, init_subscriber};
 
@@ -27,6 +30,7 @@ pub struct TestApp {
     pub port: u16,
     pub db_pool: PgPool,
     pub email_server: MockServer,
+    pub email_client: EmailClient,
     pub test_user: TestUser,
     pub api_client: reqwest::Client,
 }
@@ -206,6 +210,16 @@ impl TestApp {
             .expect("Failed to execute request")
     }
 
+    pub async fn dispatch_all_pending_emails(&self) {
+        loop {
+            match try_execute_task(&self.db_pool, &self.email_client).await {
+                Ok(ExecutionOutcome::EmptyQueue) => break,
+                Ok(ExecutionOutcome::TaskCompleted) => {}
+                Err(_) => tokio::time::sleep(Duration::from_secs(1)).await,
+            }
+        }
+    }
+
     fn get_link(&self, s: &str) -> reqwest::Url {
         let links: Vec<_> = linkify::LinkFinder::new()
             .links(s)
@@ -260,7 +274,7 @@ pub async fn spawn_app() -> TestApp {
     // Launch a mock server to stand in for Postmark's API
     let email_server = MockServer::start().await;
 
-    // Randomise configuration to ensure test isolation
+    // Randomize configuration to ensure test isolation
     let configuration = {
         let mut c = get_configuration().expect("Failed to read configuration");
         // Use a different database for each test case
@@ -290,6 +304,7 @@ pub async fn spawn_app() -> TestApp {
         port,
         db_pool: get_connection_pool(&configuration.database),
         email_server,
+        email_client: configuration.email_client.client(),
         test_user: TestUser::generate(),
         api_client,
     };

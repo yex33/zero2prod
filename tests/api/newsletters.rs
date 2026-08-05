@@ -73,8 +73,12 @@ async fn newsletters_are_not_delivered_to_unconfirmed_subscribers() {
     // Act Part 2: Follow the redirect
     let html_page = app.get_newsletters_html().await;
     assert!(html_page.contains(
-        /* html */ "<p><i>The newsletter issue has been published!</i></p>"
+        /* html */
+        "<p><i>The newsletter issue has been accepted - \
+        emails will go out shortly.</i></p>"
     ));
+
+    app.dispatch_all_pending_emails().await;
     // Mock verifies on Drop that we haven't sent the newsletter email
 }
 
@@ -115,8 +119,12 @@ async fn newsletters_are_delivered_to_confirmed_subscribers() {
     // Act Part 2: Follow the redirect
     let html_page = app.get_newsletters_html().await;
     assert!(html_page.contains(
-        /* html */ "<p><i>The newsletter issue has been published!</i></p>"
+        /* html */
+        "<p><i>The newsletter issue has been accepted - \
+        emails will go out shortly.</i></p>"
     ));
+
+    app.dispatch_all_pending_emails().await;
     // Mock verifies on Drop that we have sent the newsletter email
 }
 
@@ -200,7 +208,9 @@ async fn newsletter_creation_is_idempotent() {
     // Act Part 2: Follow the redirect
     let html_page = app.get_newsletters_html().await;
     assert!(html_page.contains(
-        /* html */ "<p><i>The newsletter issue has been published!</i></p>"
+        /* html */
+        "<p><i>The newsletter issue has been accepted - \
+        emails will go out shortly.</i></p>"
     ));
 
     // Act Part 3: Submit the newsletter form **again**
@@ -210,9 +220,12 @@ async fn newsletter_creation_is_idempotent() {
     // Act Part 4: Follow the redirect
     let html_page = app.get_newsletters_html().await;
     assert!(html_page.contains(
-        /* html */ "<p><i>The newsletter issue has been published!</i></p>"
-    ))
+        /* html */
+        "<p><i>The newsletter issue has been accepted - \
+        emails will go out shortly.</i></p>"
+    ));
 
+    app.dispatch_all_pending_emails().await;
     // Mock verifies on Drop that we have sent the newsletter email **once**
 }
 
@@ -256,5 +269,65 @@ async fn concurrent_form_submission_is_handled_gracefully() {
         response2.text().await.unwrap()
     );
 
+    app.dispatch_all_pending_emails().await;
     // Mock verifies on Drop that we have sent the newsletter email **once**
+}
+
+#[tokio::test]
+async fn transient_errors_do_not_cause_duplicate_deliveries_on_retries() {
+    // Arrange
+    let app = spawn_app().await;
+    // Two subscribers instead of one
+    app.create_confirmed_subscriber("name=subscriber1&email=subscriber1%40domain.com")
+        .await;
+    app.create_confirmed_subscriber("name=subscriber2&email=subscriber2%40domain.com")
+        .await;
+    app.post_login(&serde_json::json!({
+        "username": &app.test_user.username,
+        "password": &app.test_user.password,
+    }))
+    .await;
+    let newsletter_request_body = serde_json::json!({
+        "title": "Newsletter title",
+        "content": {
+            "text": "Newsletter body as plain text",
+            "html": "<p>Newsletter body as HTML</p>",
+        },
+        "idempotency_key": uuid::Uuid::new_v4().to_string(),
+    });
+
+    // Act Part 1: submit newsletter form
+    Mock::given(path("/email"))
+        .and(method("POST"))
+        .respond_with(ResponseTemplate::new(200))
+        .up_to_n_times(1)
+        .expect(1)
+        .mount(&app.email_server)
+        .await;
+    // Email delivery fails for the second subscriber
+    Mock::given(path("/email"))
+        .and(method("POST"))
+        .respond_with(ResponseTemplate::new(500))
+        .up_to_n_times(1)
+        .expect(1)
+        .mount(&app.email_server)
+        .await;
+
+    let response = app.post_newsletters(&newsletter_request_body).await;
+    assert_eq!(response.status().as_u16(), 303);
+
+    // Act Part 2: Retry submitting the form
+    // Email delivery will succeed for both subscribers now
+    Mock::given(path("/email"))
+        .and(method("POST"))
+        .respond_with(ResponseTemplate::new(200))
+        .expect(1)
+        .mount(&app.email_server)
+        .await;
+
+    let response = app.post_newsletters(&newsletter_request_body).await;
+    assert_eq!(response.status().as_u16(), 303);
+
+    app.dispatch_all_pending_emails().await;
+    // Mock verifies on Drop that we did not send out duplicates
 }
